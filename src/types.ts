@@ -97,3 +97,15 @@ export type VerificationPacket = {
     anchored: boolean;
   };
 };
+
+export type DashboardMessage = {
+  internalMessageId: string;
+  tenantId: string;
+  subject: string;
+  recipientAddresses: string[];
+  providerMessageId?: string;
+  createdAt: string;
+  latestEvent?: string;
+  hasReceipt: boolean;
+  batchStatus?: "pending" | "anchoring" | "anchored" | "failed";
+};

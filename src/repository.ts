@@ -4,9 +4,48 @@ import type {
   AnchorBatch,
   AnchorBatchRecord,
   CanonicalMessage,
+  DashboardMessage,
   EvidenceReceipt,
   SendGridEvent
 } from "./types.js";
+
+export interface Repository {
+  saveMessage(message: CanonicalMessage): Promise<void>;
+  setProviderMessageId(internalMessageId: string, providerMessageId: string | undefined): Promise<void>;
+  getMessage(internalMessageId: string): Promise<CanonicalMessage | undefined>;
+  saveWebhookEvents(
+    internalMessageId: string,
+    events: SendGridEvent[],
+    rawPayload: string,
+    signatureVerified: boolean,
+    headers: Record<string, string | string[] | undefined>,
+    webhookTimestamp: string | undefined
+  ): Promise<void>;
+  getEvents(internalMessageId: string): Promise<SendGridEvent[]>;
+  getLatestReceiptHash(tenantId: string): Promise<string | undefined>;
+  saveReceipt(receipt: EvidenceReceipt): Promise<void>;
+  getReceiptByHash(receiptHash: string): Promise<EvidenceReceipt | undefined>;
+  createBatch(tenantId: string, batchSize: number): Promise<AnchorBatch | undefined>;
+  setBatchSignature(batchId: string, signature: string): Promise<void>;
+  markBatchFailed(batchId: string, errorMessage: string): Promise<void>;
+  retryFailedBatch(batchId: string): Promise<void>;
+  getOpenBatchForTenant(tenantId: string): Promise<AnchorBatch | undefined>;
+  listTenantsWithUnbatchedReceipts(): Promise<string[]>;
+  claimNextPendingBatch(): Promise<(AnchorBatch & { attempts: number; lastError?: string }) | undefined>;
+  listBatches(): Promise<AnchorBatchRecord[]>;
+  getReceiptByMessageId(internalMessageId: string): Promise<EvidenceReceipt | undefined>;
+  findBatchForReceipt(receiptHash: string): Promise<
+    | {
+        batch: AnchorBatch;
+        proof: string[];
+        leafIndex: number;
+        solanaSignature?: string;
+      }
+    | undefined
+  >;
+  getBatch(batchId: string): Promise<AnchorBatchRecord | undefined>;
+  listRecentMessages(limit?: number): Promise<DashboardMessage[]>;
+}
 
 type StoredAttachment = {
   filename: string;
@@ -524,5 +563,48 @@ export class PgRepository {
       attempts: row.attempts as number,
       lastError: row.last_error as string | undefined
     };
+  }
+
+  async listRecentMessages(limit = 25): Promise<DashboardMessage[]> {
+    const result = await pool.query(
+      `
+        SELECT
+          m.internal_message_id,
+          m.tenant_id,
+          m.subject,
+          m.recipient_addresses,
+          m.provider_message_id,
+          m.created_at,
+          r.receipt_hash IS NOT NULL AS has_receipt,
+          ab.status AS batch_status,
+          (
+            SELECT we.event_type
+            FROM webhook_events we
+            WHERE we.internal_message_id = m.internal_message_id
+            ORDER BY we.received_at DESC, we.id DESC
+            LIMIT 1
+          ) AS latest_event
+        FROM messages m
+        LEFT JOIN receipts r
+          ON r.internal_message_id = m.internal_message_id
+        LEFT JOIN anchor_batches ab
+          ON ab.batch_id = r.anchored_batch_id
+        ORDER BY m.created_at DESC
+        LIMIT $1
+      `,
+      [limit]
+    );
+
+    return result.rows.map((row) => ({
+      internalMessageId: row.internal_message_id as string,
+      tenantId: row.tenant_id as string,
+      subject: row.subject as string,
+      recipientAddresses: row.recipient_addresses as string[],
+      providerMessageId: row.provider_message_id as string | undefined,
+      createdAt: new Date(row.created_at as string).toISOString(),
+      latestEvent: row.latest_event as string | undefined,
+      hasReceipt: row.has_receipt as boolean,
+      batchStatus: row.batch_status as DashboardMessage["batchStatus"]
+    }));
   }
 }

@@ -8,6 +8,8 @@ const required = (name: string, fallback?: string): string => {
   return value;
 };
 
+const optional = (name: string, fallback = ""): string => process.env[name] ?? fallback;
+
 const integer = (name: string, fallback: number): number => {
   const raw = process.env[name];
   if (!raw) {
@@ -24,10 +26,10 @@ const integer = (name: string, fallback: number): number => {
 export const config = {
   port: integer("PORT", 3000),
   databaseUrl: required("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mail_anchor"),
-  sendgridWebhookPublicKey: required("SENDGRID_WEBHOOK_PUBLIC_KEY"),
-  sendgridApiKey: required("SENDGRID_API_KEY"),
-  sendgridFromAddress: required("SENDGRID_FROM_ADDRESS"),
-  receiptSigningSecret: required("RECEIPT_SIGNING_SECRET"),
+  sendgridWebhookPublicKey: optional("SENDGRID_WEBHOOK_PUBLIC_KEY"),
+  sendgridApiKey: optional("SENDGRID_API_KEY"),
+  sendgridFromAddress: optional("SENDGRID_FROM_ADDRESS", "demo@local.test"),
+  receiptSigningSecret: optional("RECEIPT_SIGNING_SECRET", "demo-receipt-secret"),
   enableAnchorWorker: (process.env.ENABLE_ANCHOR_WORKER ?? "false") === "true",
   anchorPollIntervalMs: integer("ANCHOR_POLL_INTERVAL_MS", 15000),
   solanaRpcUrl: required("SOLANA_RPC_URL", "https://api.devnet.solana.com"),

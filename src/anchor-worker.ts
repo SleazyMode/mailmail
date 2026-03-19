@@ -1,14 +1,14 @@
 import { anchorBatchToSolana } from "./solana.js";
-import type { PgRepository } from "./repository.js";
+import type { Repository } from "./repository.js";
 
 type AnchorWorkerOptions = {
-  repository: PgRepository;
+  repository: Repository;
   batchSize: number;
   intervalMs: number;
 };
 
 export class AnchorWorker {
-  private readonly repository: PgRepository;
+  private readonly repository: Repository;
   private readonly batchSize: number;
   private readonly intervalMs: number;
   private timer?: NodeJS.Timeout;

@@ -2,7 +2,9 @@ import MailService from "@sendgrid/mail";
 
 import { config } from "./config.js";
 
-MailService.setApiKey(config.sendgridApiKey);
+if (config.sendgridApiKey) {
+  MailService.setApiKey(config.sendgridApiKey);
+}
 
 type SendMailInput = {
   to: string[];
@@ -44,6 +46,10 @@ export const buildMimeMessage = (input: SendMailInput): string => {
 };
 
 export const sendViaSendGrid = async (input: SendMailInput): Promise<string | undefined> => {
+  if (!config.sendgridApiKey) {
+    throw new Error("SendGrid is not configured. Use the demo flow instead.");
+  }
+
   const [response] = await MailService.send({
     to: input.to,
     from: config.sendgridFromAddress,
